@@ -17,7 +17,7 @@ typedef enum
 
 void NFSC_List(char **options, int optionsCount);
 void NFSC_Parse(char *path);
-void NFSC_DisplayFolderContents(char *path, bool reccursive, char permissions[9], int maxiumumSize);
+void NFSC_DisplayFolderContents(char *path, bool reccursive, char permissions[10], int maxiumumSize);
 int NFSC_ThrowError(char *message);
 int NSFC_PermissionsToOctal(const char permString[9]);
 char *NFSC_ReverseString(char *str);
@@ -64,6 +64,10 @@ char *NFSC_ReverseString(char *str)
 void NFSC_Parse(char *path)
 {
     int fileDescription = open(path, O_RDONLY);
+    if (fileDescription < 0)
+    {
+        printf("error!");
+    }
     int version, sectionsNumber;
 
     if (validateMagicWord(fileDescription) || (version = validateVersion(fileDescription)) == 0 ||
@@ -77,7 +81,7 @@ void NFSC_Parse(char *path)
     for (size_t i = 0; i < sectionsNumber; i++)
     {
         short type;
-        char name[8];
+        char name[9] = {0};
         int size;
 
         read(fileDescription, name, 8);
@@ -90,7 +94,7 @@ void NFSC_Parse(char *path)
 
 int validateMagicWord(int fd)
 {
-    char magicWord[4];
+    char magicWord[5] = {0};
     lseek(fd, -4, SEEK_END);
     read(fd, magicWord, 4);
     if (strcmp(magicWord, "Wa49") != 0)
@@ -168,7 +172,7 @@ void NFSC_List(char **options, int optionsCount)
 {
     bool recursive = false;
     char *path = NULL;
-    char permissions[9] = "uninit";
+    char permissions[10] = {0};
     size_t maximumSize = INT_MAX;
 
     for (size_t i = 2; i < optionsCount; ++i)
@@ -197,7 +201,7 @@ void NFSC_List(char **options, int optionsCount)
     path = NULL;
 }
 
-void NFSC_DisplayFolderContents(char *path, bool recursive, char permissions[9], int maximumSize)
+void NFSC_DisplayFolderContents(char *path, bool recursive, char permissions[10], int maximumSize)
 {
     DIR *dir = NULL;
     if ((dir = opendir(path)) == NULL)
@@ -208,7 +212,8 @@ void NFSC_DisplayFolderContents(char *path, bool recursive, char permissions[9],
 
     struct dirent *entry = NULL;
     struct stat statbuf;
-    bool filterByPermissons = strcmp(permissions, "uninit") != 0;
+    char zeros[10] = {0};
+    bool filterByPermissons = strcmp(permissions, zeros) != 0;
     while ((entry = readdir(dir)) != NULL)
     {
         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
