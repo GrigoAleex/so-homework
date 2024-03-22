@@ -2,6 +2,8 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
 
@@ -14,10 +16,16 @@ typedef enum
 } bool;
 
 void NFSC_List(char **options, int optionsCount);
+void NFSC_Parse(char *path);
 void NFSC_DisplayFolderContents(char *path, bool reccursive, char permissions[9], int maxiumumSize);
 int NFSC_ThrowError(char *message);
 int NSFC_PermissionsToOctal(const char permString[9]);
-void NFSC_ProcessListOptoins(const char *option, bool *recursive, char **path, char *permissions, int *maximumSize);
+char *NFSC_ReverseString(char *str);
+int validateMagicWord(int fd);
+short NFSC_GetHeaderSize(int fd);
+int validateVersion(int fd);
+int validateSectionNumber(int fd);
+int validateSectionTypes(int fd);
 
 int main(int argc, char **argv)
 {
@@ -31,7 +39,128 @@ int main(int argc, char **argv)
         {
             NFSC_List(argv, argc);
         }
+        if (strcmp(argv[1], "parse") == 0)
+        {
+            NFSC_Parse(argv[2] + 5);
+        }
     }
+    return 0;
+}
+
+char *NFSC_ReverseString(char *str)
+{
+    int length = strlen(str);
+
+    for (int i = 0; i < length / 2; i++)
+    {
+        char temp = str[i];
+        str[i] = str[length - i - 1];
+        str[length - i - 1] = temp;
+    }
+
+    return str;
+}
+
+void NFSC_Parse(char *path)
+{
+    int fileDescription = open(path, O_RDONLY);
+    int version, sectionsNumber;
+
+    if (validateMagicWord(fileDescription) || (version = validateVersion(fileDescription)) == 0 ||
+        (sectionsNumber = validateSectionNumber(fileDescription)) == 0 || validateSectionTypes(fileDescription))
+        return;
+
+    puts("SUCCESS");
+    printf("version=%d\nnr_sections=%d\n", version, sectionsNumber);
+    short headerSize = NFSC_GetHeaderSize(fileDescription);
+    lseek(fileDescription, -headerSize + 5, SEEK_END);
+    for (size_t i = 0; i < sectionsNumber; i++)
+    {
+        short type;
+        char name[8];
+        int size;
+
+        read(fileDescription, name, 8);
+        read(fileDescription, &type, 2);
+        read(fileDescription, &size, 4); // acesta este offsetul
+        read(fileDescription, &size, 4);
+        printf("section%ld: %s %d %d\n", i + 1, name, type, size);
+    }
+}
+
+int validateMagicWord(int fd)
+{
+    char magicWord[4];
+    lseek(fd, -4, SEEK_END);
+    read(fd, magicWord, 4);
+    if (strcmp(magicWord, "Wa49") != 0)
+    {
+        printf("ERROR\nwrong magic");
+        return 1;
+    }
+
+    return 0;
+}
+
+short NFSC_GetHeaderSize(int fd)
+{
+    short headerSize;
+
+    lseek(fd, -6, SEEK_END);
+    read(fd, &headerSize, 2);
+
+    return headerSize;
+}
+
+int validateVersion(int fd)
+{
+    short headerSize = NFSC_GetHeaderSize(fd);
+    int version;
+    lseek(fd, -headerSize, SEEK_END);
+    read(fd, &version, 4);
+
+    if ((version < 98) || (version > 127))
+    {
+        printf("ERROR\nwrong version");
+        return 0;
+    }
+    return version;
+}
+
+int validateSectionNumber(int fd)
+{
+    short headerSize = NFSC_GetHeaderSize(fd);
+    char sectionsNumber;
+    lseek(fd, -headerSize + 4, SEEK_END);
+    read(fd, &sectionsNumber, 1);
+    if (sectionsNumber != 2 && (sectionsNumber < 4 || sectionsNumber > 17))
+    {
+        printf("ERROR\nwrong sect_nr");
+        return 0;
+    }
+    return sectionsNumber;
+}
+int validateSectionTypes(int fd)
+{
+    short headerSize = NFSC_GetHeaderSize(fd);
+
+    char sectionsNumber;
+    lseek(fd, -headerSize + 4, SEEK_END);
+    read(fd, &sectionsNumber, 1);
+
+    while (sectionsNumber)
+    {
+        sectionsNumber--;
+        short type;
+        lseek(fd, -headerSize + 5 + 8 + sectionsNumber * 18, SEEK_END);
+        read(fd, &type, 2);
+        if (type != 93 && type != 91 && type != 60)
+        {
+            printf("ERROR\nwrong sect_types");
+            return 1;
+        }
+    }
+
     return 0;
 }
 
@@ -44,7 +173,6 @@ void NFSC_List(char **options, int optionsCount)
 
     for (size_t i = 2; i < optionsCount; ++i)
     {
-        // NFSC_ProcessListOptoins(options[i], &recursive, &path, permissions, &maximumSize);
         if (strcmp(options[i], "recursive") == 0)
             recursive = true;
         else if (strstr(options[i], "path") != NULL)
@@ -122,25 +250,4 @@ int NSFC_PermissionsToOctal(const char permString[9])
     }
 
     return perms;
-}
-
-void NFSC_ProcessListOptoins(const char *option, bool *recursive, char **path, char *permissions, int *maximumSize)
-{
-    if (strcmp(option, "recursive") == 0)
-    {
-        *recursive = true;
-    }
-    else if (strstr(option, "path") == option)
-    {
-        *path = realloc(*path, strlen(option + 5) + 1);
-        strcpy(*path, option + 5);
-    }
-    else if (strstr(option, "permissions") == option)
-    {
-        strcpy(permissions, option + 12);
-    }
-    else if (strstr(option, "size_smaller") == option)
-    {
-        *maximumSize = atoi(option + 13);
-    }
 }
