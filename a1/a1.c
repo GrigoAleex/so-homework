@@ -217,7 +217,7 @@ void NFSC_Extract(char **options, int optionsCount)
     }
 
     puts("SUCCESS");
-    int fileDescription = open(path, O_RDONLY);
+    int fileDescription = open(path, O_RDWR);
     short headerSize = NFSC_GetHeaderSize(fileDescription);
 
     int sectionOffset;
@@ -226,28 +226,48 @@ void NFSC_Extract(char **options, int optionsCount)
     read(fileDescription, &sectionOffset, 4);
     read(fileDescription, &sectionSize, 4);
 
-    char section[sectionSize + 1];
+    char section[sectionSize];
+    memset(section, 0, sectionSize);
     lseek(fileDescription, sectionOffset, SEEK_SET);
-    read(fileDescription, &section, sectionSize);
+    read(fileDescription, section, sectionSize);
 
-    char newLine[] = {10};
+    char newLine[] = "\r\n";
     int lineNumber = 0;
     char *cur = strtok(section, newLine);
+    char *result = (char *)calloc(sectionSize, 1);
+
     while (cur != NULL)
     {
+        // printf("%d, %d, %s\n", lineNumber, cur[0], cur);
+        // if (cur[0] == '\n')
+        // {
         lineNumber++;
+        // }
         if (lineNumber == wishedLineNumber)
         {
-            printf("%s\n", NFSC_ReverseString(cur));
+            result = strcat(result, cur);
+        }
+        if (lineNumber > wishedLineNumber)
+        {
             break;
         }
 
         cur = strtok(NULL, newLine);
     }
 
+    printf("%s\n", NFSC_ReverseString(result));
     free(path);
     path = NULL;
 }
+
+//
+// JdY6Kc8eUrCNjXrfxPiU6j7jH6AqpbxsZxsvnWZBJcthDo4w2RnZ7Kmx1n2GfG3jDAnBheiaZWo8j
+// j8oWZaiehBnADj3GfG2n1xmK7ZnR2w4oDhtcJBZWnvsxZsxbpqA6Hj7j6UiPxfrXjNCrUe8cK6YdJ
+// j8oWZaiehB ADj3GfG2 1xmK7Z R2w4oDhtcJBZW  sxZsxbpqA6Hj7j6Ui xfrXjNCrUe8cK6YdJ
+// JdY6Kc8eUrCNjXrfxPiu6j7jH6qpbxszZsvnWZBJcthDo4w2RnZ7Km1n2Gf3jDnBheiaZWo8j
+// JdY6Kc8eUrCNjXrfxPiU6j7jH6Aqpbx Zx vnWZBJcthDo4w2RnZ7Kmx1n2GfG3jDAnBheiaZWo8j
+// JdY6Kc8e rCNjXrfxPi 6j7jH6AqpbxsZxsvnWZBJcthDo4w2RnZ7Kmx1n2GfG3jDAnBheiaZWo8j
+// JdY6Kc8eUrCNjXrfxPiU6jjH6AqpbxsZxsvnWZBJcth Do4w RnZ Kmx1n GfG3jDAnBheiaZWo8j
 
 void NFSC_List(char **options, int optionsCount)
 {
