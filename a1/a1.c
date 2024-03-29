@@ -256,6 +256,7 @@ void NFSC_Extract(char **options, int optionsCount)
     }
 
     printf("%s\n", NFSC_ReverseString(result));
+    free(cur);
     free(result);
     free(path);
     path = NULL;
