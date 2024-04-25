@@ -26,20 +26,20 @@ int finishedThreads = 0;
 
 void *thread_function8(void *args) {
     PARAM* param = (PARAM*)args; 
-    sem_wait(param->semaphore);
-    
+    sem_wait(param->semaphore); 
     info(BEGIN, 8, param->threadNr);
+
     nrOfThreads++;
-    if (param->threadNr == 14 && finishedThreads < 46) {
+    if (param->threadNr == 14 && finishedThreads < 47) {
         waitingFor14 = 1;
         while (nrOfThreads != 4) ;
-    } else  while (waitingFor14 == 1) ;
+    } 
+    while (waitingFor14 == 1 && param->threadNr != 14) ;
 
     nrOfThreads--;
     finishedThreads++;
     info(END, 8, param->threadNr);
     if (param->threadNr == 14) waitingFor14 = 0;
-
     sem_post(param->semaphore);
     return NULL;
 }
@@ -148,10 +148,14 @@ void process8() {
 
 
     for(int i=0; i<NR_THREADS; i++) {
+        if (i == 3) i = 13;
+        else if (i == 13) i = 3; 
         params[i].threadNr = i + 1;
         params[i].semaphore = &logSem;
 
         pthread_create(&tids[i], NULL, thread_function8, (void*)&params[i]);
+        if (i == 13) i = 3;
+        else if (i == 3) i = 13; 
     }
 
     for(int i=0; i<NR_THREADS; i++) pthread_join(tids[i], NULL);
