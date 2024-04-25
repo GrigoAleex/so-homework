@@ -18,25 +18,29 @@ typedef struct {
 } DADPARAM;
 
 sem_t tatalSexy;
+int nrOfThreads = 0;
+int waitingFor14 = 0;
+int finishedThreads = 0;
 
 #define NR_THREADS 50
 
-void *limited_area(void *args) {
-    PARAM* param = (PARAM*)args; 
-
-    info(BEGIN, 8, param->threadNr);  
-    info(END, 8, param->threadNr);
-
-    return NULL;
-}
-
 void *thread_function8(void *args) {
     PARAM* param = (PARAM*)args; 
-
     sem_wait(param->semaphore);
-    limited_area(param);
-    sem_post(param->semaphore);
+    
+    info(BEGIN, 8, param->threadNr);
+    nrOfThreads++;
+    if (param->threadNr == 14 && finishedThreads < 46) {
+        waitingFor14 = 1;
+        while (nrOfThreads != 4) ;
+    } else  while (waitingFor14 == 1) ;
 
+    nrOfThreads--;
+    finishedThreads++;
+    info(END, 8, param->threadNr);
+    if (param->threadNr == 14) waitingFor14 = 0;
+
+    sem_post(param->semaphore);
     return NULL;
 }
 
@@ -132,10 +136,9 @@ void *thread34(void *unused) {
 void process8() {
     if (fork() != 0) return;
     info(BEGIN, 8, 0); 
-    srand(time(NULL));
     
     pthread_t tids[NR_THREADS];
-    PARAM params[NR_THREADS];
+    PARAM *params = (PARAM*)malloc(NR_THREADS * sizeof(PARAM));
     sem_t logSem;
 
     if(sem_init(&logSem, 0, 4) != 0) {
@@ -143,13 +146,18 @@ void process8() {
         return;
     }
 
+
     for(int i=0; i<NR_THREADS; i++) {
         params[i].threadNr = i + 1;
         params[i].semaphore = &logSem;
-        pthread_create(&tids[i], NULL, thread_function8, &params[i]);
+
+        pthread_create(&tids[i], NULL, thread_function8, (void*)&params[i]);
     }
 
     for(int i=0; i<NR_THREADS; i++) pthread_join(tids[i], NULL);
+
+    free(params);
+    sem_destroy(&logSem);
     
     info(END, 8, 0);
     exit(0);
